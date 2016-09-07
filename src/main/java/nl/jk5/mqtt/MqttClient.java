@@ -4,10 +4,13 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.concurrent.DefaultPromise;
@@ -101,6 +104,10 @@ public final class MqttClient {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(this.eventLoop);
         bootstrap.channel(clientConfig.getChannelClass());
+        bootstrap.option(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
+        bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
+        bootstrap.handler(new LoggingHandler(LogLevel.INFO));
+
         bootstrap.remoteAddress(host, port);
         bootstrap.handler(new MqttChannelInitializer(connectFuture));
         ChannelFuture future = bootstrap.connect();
