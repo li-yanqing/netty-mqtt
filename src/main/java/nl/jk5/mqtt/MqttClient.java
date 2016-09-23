@@ -117,6 +117,8 @@ public final class MqttClient {
                 if (!connectFuture.isDone()) {
                     connectFuture.setFailure(f.cause());
                 }
+            }else{
+                channel = f.channel();
             }
         });
 
