@@ -320,10 +320,17 @@ public final class MqttClient {
 
         MqttPendingPublish pendingPublish = new MqttPendingPublish(variableHeader.messageId(), future, payload.retain(),
                 message, qos);
-        pendingPublish.setSent(this.sendAndFlushPacket(message) != null);
+        
+        ChannelFuture pfuture = this.sendAndFlushPacket(message);
+
+        pendingPublish.setSent(pfuture != null);
 
         if (pendingPublish.isSent() && pendingPublish.getQos() == MqttQoS.AT_MOST_ONCE) {
-            pendingPublish.getFuture().setSuccess(null); // We don't get an ACK for QOS 0
+            pfuture.addListener((ChannelFutureListener) f -> {
+                if (f.isSuccess()) {
+                    pendingPublish.getFuture().setSuccess(null); // We don't get an ACK for QOS 0
+                }
+            });
         } else if (pendingPublish.isSent()) {
             this.pendingPublishes.put(pendingPublish.getMessageId(), pendingPublish);
             pendingPublish.startPublishRetransmissionTimer(this.eventLoop.next(), this::sendAndFlushPacket);
