@@ -106,12 +106,19 @@ public final class MqttClient {
         bootstrap.channel(clientConfig.getChannelClass());
         bootstrap.option(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
         bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
+        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.clientConfig.getTimeoutSeconds() * 1000);
         bootstrap.handler(new LoggingHandler(LogLevel.INFO));
 
         bootstrap.remoteAddress(host, port);
         bootstrap.handler(new MqttChannelInitializer(connectFuture));
         ChannelFuture future = bootstrap.connect();
-        future.addListener((ChannelFutureListener) f -> MqttClient.this.channel = f.channel());
+        future.addListener((ChannelFutureListener) f -> {
+            if (!f.isSuccess()) {
+                if (!connectFuture.isDone()) {
+                    connectFuture.setFailure(f.cause());
+                }
+            }
+        });
 
         return connectFuture;
     }

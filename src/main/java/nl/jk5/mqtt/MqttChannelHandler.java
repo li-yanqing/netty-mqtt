@@ -115,7 +115,9 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
     private void handleConack(Channel channel, MqttConnAckMessage message){
         switch(message.variableHeader().connectReturnCode()){
             case CONNECTION_ACCEPTED:
-                this.connectFuture.setSuccess(new MqttConnectResult(true, MqttConnectReturnCode.CONNECTION_ACCEPTED, channel.closeFuture()));
+                if (!this.connectFuture.isDone())
+                    this.connectFuture.setSuccess(new MqttConnectResult(true, MqttConnectReturnCode.CONNECTION_ACCEPTED,
+                            channel.closeFuture()));
 
                 this.client.getPendingSubscribtions().entrySet().stream().filter((e) -> !e.getValue().isSent()).forEach((e) -> {
                     channel.write(e.getValue().getSubscribeMessage());
@@ -127,7 +129,8 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
                     channel.write(publish.getMessage());
                     publish.setSent(true);
                     if(publish.getQos() == MqttQoS.AT_MOST_ONCE){
-                        publish.getFuture().setSuccess(null); //We don't get an ACK for QOS 0
+                        if (!publish.getFuture().isDone())
+                            publish.getFuture().setSuccess(null); // We don't get an ACK for QOS 0
                         this.client.getPendingPublishes().remove(publish.getMessageId());
                     }
                 });
@@ -139,7 +142,9 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
             case CONNECTION_REFUSED_NOT_AUTHORIZED:
             case CONNECTION_REFUSED_SERVER_UNAVAILABLE:
             case CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION:
-                this.connectFuture.setSuccess(new MqttConnectResult(false, message.variableHeader().connectReturnCode(), channel.closeFuture()));
+                if (!this.connectFuture.isDone())
+                    this.connectFuture.setSuccess(new MqttConnectResult(false,
+                            message.variableHeader().connectReturnCode(), channel.closeFuture()));
                 channel.close();
                 // Don't start reconnect logic here
                 break;
@@ -160,7 +165,8 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
         this.client.getPendingSubscribeTopics().remove(pendingSubscribtion.getTopic());
 
         this.client.getServerSubscribtions().add(pendingSubscribtion.getTopic());
-        pendingSubscribtion.getFuture().setSuccess(null);
+        if (!pendingSubscribtion.getFuture().isDone())
+            pendingSubscribtion.getFuture().setSuccess(null);
     }
 
     private void handlePublish(Channel channel, MqttPublishMessage message){
@@ -202,13 +208,15 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
         }
         unsubscribtion.onUnsubackReceived();
         this.client.getServerSubscribtions().remove(unsubscribtion.getTopic());
-        unsubscribtion.getFuture().setSuccess(null);
+        if (!unsubscribtion.getFuture().isDone())
+            unsubscribtion.getFuture().setSuccess(null);
         this.client.getPendingServerUnsubscribes().remove(message.variableHeader().messageId());
     }
 
     private void handlePuback(MqttPubAckMessage message){
         MqttPendingPublish pendingPublish = this.client.getPendingPublishes().get(message.variableHeader().messageId());
-        pendingPublish.getFuture().setSuccess(null);
+        if (!pendingPublish.getFuture().isDone())
+            pendingPublish.getFuture().setSuccess(null);
         pendingPublish.onPubackReceived();
         this.client.getPendingPublishes().remove(message.variableHeader().messageId());
         pendingPublish.getPayload().release();
@@ -242,7 +250,8 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
     private void handlePubcomp(MqttMessage message){
         MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) message.variableHeader();
         MqttPendingPublish pendingPublish = this.client.getPendingPublishes().get(variableHeader.messageId());
-        pendingPublish.getFuture().setSuccess(null);
+        if (!pendingPublish.getFuture().isDone())
+            pendingPublish.getFuture().setSuccess(null);
         this.client.getPendingPublishes().remove(variableHeader.messageId());
         pendingPublish.getPayload().release();
         pendingPublish.onPubcompReceived();
