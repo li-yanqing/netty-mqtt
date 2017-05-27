@@ -1,12 +1,14 @@
 package nl.jk5.mqtt;
 
-import io.netty.channel.Channel;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.mqtt.MqttVersion;
+import java.io.File;
+import java.util.Random;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Random;
+
+import io.netty.channel.Channel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.mqtt.MqttVersion;
 
 @SuppressWarnings({"WeakerAccess", "unused"})
 public final class MqttClientConfig {
@@ -21,6 +23,13 @@ public final class MqttClientConfig {
     private boolean cleanSession = false;
     @Nullable private MqttLastWill lastWill;
     private Class<? extends Channel> channelClass = NioSocketChannel.class;
+    
+    private boolean useTLS = false;
+    private File clientCert;
+    private File trustStore;
+    private boolean useOCSP = false;
+    private String ocspResponderURL;
+    
 
     public MqttClientConfig() {
         Random random = new Random();
@@ -110,4 +119,46 @@ public final class MqttClientConfig {
     public void setChannelClass(Class<? extends Channel> channelClass) {
         this.channelClass = channelClass;
     }
+
+    public boolean isUseTLS() {
+        return useTLS;
+    }
+
+    public void setUseTLS(boolean useTLS) {
+        this.useTLS = useTLS;
+    }
+
+    public File getClientCert() {
+        return clientCert;
+    }
+
+    public void setClientCert(File clientCert) {
+        this.clientCert = clientCert;
+    }
+
+    public File getTrustStore() {
+        return trustStore;
+    }
+
+    public void setTrustStore(File trustStore) {
+        this.trustStore = trustStore;
+    }
+
+    public boolean isUseOCSP() {
+        return useOCSP;
+    }
+
+    public void setUseOCSP(boolean useOCSP) {
+        this.useOCSP = useOCSP;
+    }
+
+    public String getOcspResponderURL() {
+        return ocspResponderURL;
+    }
+
+    public void setOcspResponderURL(String ocspResponderURL) {
+        this.ocspResponderURL = ocspResponderURL;
+    }
+    
+    
 }
