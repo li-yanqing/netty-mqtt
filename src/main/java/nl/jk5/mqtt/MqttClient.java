@@ -90,11 +90,16 @@ public final class MqttClient {
     private Channel                                           channel;
 
     private MqttConnectionHandler                             connectionHandler            = new MqttConnectionHandler() {
-        public void onConnected() { }
-        public void onDisConnected() { }
-        public void onConnectFailed() { }
-    };
-    
+                                                                                               public void onConnected() {
+                                                                                               }
+
+                                                                                               public void onDisConnected() {
+                                                                                               }
+
+                                                                                               public void onConnectFailed() {
+                                                                                               }
+                                                                                           };
+
     /**
      * Construct the MqttClient with default config
      */
@@ -508,12 +513,12 @@ public final class MqttClient {
 
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
-            if(MqttClient.this.clientConfig.isUseTLS()){
-                 SslContext context = SslContextBuilder.forClient()
-//                         .keyManager(null, null, new X509Certificate[]{getCertFromFile(MqttClient.this.clientConfig.getClientCert())})
-                         .keyManager(createKeyManager())
-                         .trustManager(createTrustManager()).build();
-                 ch.pipeline().addLast("ssl", context.newHandler(ch.alloc()));
+            if (MqttClient.this.clientConfig.isUseTLS()) {
+                SslContext context = SslContextBuilder.forClient()
+                        // .keyManager(null, null, new
+                        // X509Certificate[]{getCertFromFile(MqttClient.this.clientConfig.getClientCert())})
+                        .keyManager(createKeyManager()).trustManager(createTrustManager()).build();
+                ch.pipeline().addLast("ssl", context.newHandler(ch.alloc()));
             }
 
             ch.pipeline().addLast("mqttDecoder", new MqttDecoder());
@@ -528,20 +533,22 @@ public final class MqttClient {
         }
 
         private TrustManagerFactory createTrustManager() {
-            if(clientConfig.isUseOCSP()){
+            if (clientConfig.isUseOCSP()) {
                 System.setProperty("com.sun.security.enableCRLDP", "true");
                 System.setProperty("com.sun.net.ssl.checkRevocation", "true");
                 Security.setProperty("ocsp.enable", "true");
                 Security.setProperty("ocsp.responderURL", clientConfig.getOcspResponderURL());
-                
+
+              //TODO  clean here
                 OCSPTrustManagerFactory ocsp = OCSPTrustManagerFactory.INSTANCE;
-                ocsp.setOcspServerString(clientConfig.getOcspResponderURL());
-                ocsp.setOcspRootCACert(getCertFromFile(new File("/Users/vange/Documents/projects/Geely-CSP/others/Certification/External-Services-Issuing-Test-CA.pem")));
-                
+                OCSPTrustManagerFactory.setOcspServerString(clientConfig.getOcspResponderURL());
+                OCSPTrustManagerFactory.setOcspRootCACert(getCertFromFile(new File(
+                        "/Users/vange/Documents/projects/Geely-CSP/others/Certification/External-Services-Issuing-Test-CA.pem")));
+
                 return ocsp;
             }
-            
-            return InsecureTrustManagerFactory.INSTANCE;
+            return TrustAllManagerFactory.INSTANCE;
+
         }
 
         private KeyManagerFactory createKeyManager() {
@@ -572,15 +579,15 @@ public final class MqttClient {
 
     private static X509Certificate getCertFromFile(File certFile) {
         X509Certificate cert = null;
-        FileInputStream fis = null; 
+        FileInputStream fis = null;
         try {
             fis = new FileInputStream(certFile);
             CertificateFactory cf = CertificateFactory.getInstance("X509");
             cert = (X509Certificate) cf.generateCertificate(fis);
         } catch (Exception e) {
             throw new RuntimeException("Can't construct X509 Certificate. " + e.getMessage());
-        }finally{
-            if(fis!=null){
+        } finally {
+            if (fis != null) {
                 try {
                     fis.close();
                 } catch (IOException e) {

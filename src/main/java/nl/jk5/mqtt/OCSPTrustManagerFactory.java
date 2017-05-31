@@ -1,11 +1,9 @@
 package nl.jk5.mqtt;
 
-import java.io.File;
-import java.io.FileInputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.security.KeyStore;
 import java.security.Security;
-import java.security.SecurityPermission;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
@@ -15,15 +13,14 @@ import java.security.cert.PKIXCertPathValidatorResult;
 import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
 
 import javax.net.ssl.ManagerFactoryParameters;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.X509ExtendedTrustManager;
 
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
 import io.netty.util.internal.EmptyArrays;
@@ -77,13 +74,52 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
         return new TrustManager[] { tm };
     }
 
-    private static class InnerX509TrustManager implements X509TrustManager {
+    private static class InnerX509TrustManager extends X509ExtendedTrustManager {
 
-        public void checkClientTrusted(X509Certificate[] chain, String s) {
-            logger.debug("Accepting a client certificate: " + chain[0].getSubjectDN());
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            // TODO Auto-generated method stub
+            
         }
 
-        public void checkServerTrusted(X509Certificate[] chain, String s) {
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket)
+                throws CertificateException {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
+                throws CertificateException {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket)
+                throws CertificateException {
+            
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
+                throws CertificateException {
+            // TODO Auto-generated method stub
+            
+            //TODO  clean here
             try {
                 CertPath cp = null;
                 Vector certs = new Vector();
@@ -141,10 +177,7 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
 
             System.out.println("CERTIFICATE VALIDATION SUCCEEDED");
 
-        }
-
-        public X509Certificate[] getAcceptedIssuers() {
-            return EmptyArrays.EMPTY_X509_CERTIFICATES;
+            
         }
 
     }
