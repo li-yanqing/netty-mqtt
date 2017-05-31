@@ -1,25 +1,63 @@
 package nl.jk5.mqtt;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.Security;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
+
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttDecoder;
+import io.netty.handler.codec.mqtt.MqttEncoder;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttSubscribePayload;
+import io.netty.handler.codec.mqtt.MqttTopicSubscription;
+import io.netty.handler.codec.mqtt.MqttUnsubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttUnsubscribePayload;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents an MqttClient connected to a single MQTT server. Will try to keep the connection going at all times
@@ -50,13 +88,13 @@ public final class MqttClient {
     private EventLoopGroup                                    eventLoop;
 
     private Channel                                           channel;
-    
+
     private MqttConnectionHandler                             connectionHandler            = new MqttConnectionHandler() {
         public void onConnected() { }
         public void onDisConnected() { }
         public void onConnectFailed() { }
     };
-
+    
     /**
      * Construct the MqttClient with default config
      */
@@ -117,7 +155,7 @@ public final class MqttClient {
                 if (!connectFuture.isDone()) {
                     connectFuture.setFailure(f.cause());
                 }
-            }else{
+            } else {
                 channel = f.channel();
             }
         });
@@ -126,8 +164,7 @@ public final class MqttClient {
     }
 
     public ChannelFuture disconnect() {
-        MqttFixedHeader header = new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.AT_MOST_ONCE,
-                false, 0);
+        MqttFixedHeader header = new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.AT_MOST_ONCE, false, 0);
         return channel.writeAndFlush(new MqttMessage(header)).addListener(ChannelFutureListener.CLOSE);
     }
 
@@ -320,7 +357,7 @@ public final class MqttClient {
 
         MqttPendingPublish pendingPublish = new MqttPendingPublish(variableHeader.messageId(), future, payload.retain(),
                 message, qos);
-        
+
         ChannelFuture pfuture = this.sendAndFlushPacket(message);
 
         pendingPublish.setSent(pfuture != null);
@@ -471,6 +508,14 @@ public final class MqttClient {
 
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
+            if(MqttClient.this.clientConfig.isUseTLS()){
+                 SslContext context = SslContextBuilder.forClient()
+//                         .keyManager(null, null, new X509Certificate[]{getCertFromFile(MqttClient.this.clientConfig.getClientCert())})
+                         .keyManager(createKeyManager())
+                         .trustManager(createTrustManager()).build();
+                 ch.pipeline().addLast("ssl", context.newHandler(ch.alloc()));
+            }
+
             ch.pipeline().addLast("mqttDecoder", new MqttDecoder());
             ch.pipeline().addLast("mqttEncoder", MqttEncoder.INSTANCE);
             ch.pipeline().addLast("idleStateHandler",
@@ -479,6 +524,72 @@ public final class MqttClient {
             ch.pipeline().addLast("mqttPingHandler",
                     new MqttPingHandler(MqttClient.this.clientConfig.getTimeoutSeconds()));
             ch.pipeline().addLast("mqttHandler", new MqttChannelHandler(MqttClient.this, connectFuture));
+
+        }
+
+        private TrustManagerFactory createTrustManager() {
+            if(clientConfig.isUseOCSP()){
+                System.setProperty("com.sun.security.enableCRLDP", "true");
+                System.setProperty("com.sun.net.ssl.checkRevocation", "true");
+                Security.setProperty("ocsp.enable", "true");
+                Security.setProperty("ocsp.responderURL", clientConfig.getOcspResponderURL());
+                
+                OCSPTrustManagerFactory ocsp = OCSPTrustManagerFactory.INSTANCE;
+                ocsp.setOcspServerString(clientConfig.getOcspResponderURL());
+                ocsp.setOcspRootCACert(getCertFromFile(new File("/Users/vange/Documents/projects/Geely-CSP/others/Certification/External-Services-Issuing-Test-CA.pem")));
+                
+                return ocsp;
+            }
+            
+            return InsecureTrustManagerFactory.INSTANCE;
+        }
+
+        private KeyManagerFactory createKeyManager() {
+            KeyManagerFactory kmf = null;
+            InputStream in;
+            String pkPath = "/Users/vange/Programs/apache-activemq-5.14.5/conf/client.ks";
+            String caPath = "/Users/vange/Programs/apache-activemq-5.14.5/conf/client.ts";
+            try {
+                KeyStore ks = KeyStore.getInstance("JKS");
+                in = new FileInputStream(pkPath);
+                ks.load(in, "password".toCharArray());
+                kmf = KeyManagerFactory.getInstance("SunX509");
+                kmf.init(ks, "password".toCharArray());
+                in.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return kmf;
         }
     }
+
+    /*
+     * Read a certificate from the specified filepath.
+     */
+    private static X509Certificate getCertFromFile(String path) {
+        return getCertFromFile(new File(path));
+    }
+
+    private static X509Certificate getCertFromFile(File certFile) {
+        X509Certificate cert = null;
+        FileInputStream fis = null; 
+        try {
+            fis = new FileInputStream(certFile);
+            CertificateFactory cf = CertificateFactory.getInstance("X509");
+            cert = (X509Certificate) cf.generateCertificate(fis);
+        } catch (Exception e) {
+            throw new RuntimeException("Can't construct X509 Certificate. " + e.getMessage());
+        }finally{
+            if(fis!=null){
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return cert;
+
+    }
+
 }
