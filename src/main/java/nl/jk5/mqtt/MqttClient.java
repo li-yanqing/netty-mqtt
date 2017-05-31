@@ -2,14 +2,18 @@ package nl.jk5.mqtt;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyFactory;
 import java.security.KeyStore;
+import java.security.PrivateKey;
 import java.security.Security;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
-import java.security.cert.PKIXParameters;
-import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.security.spec.RSAPrivateKeySpec;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -52,7 +56,6 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.concurrent.DefaultPromise;
@@ -514,10 +517,8 @@ public final class MqttClient {
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
             if (MqttClient.this.clientConfig.isUseTLS()) {
-                SslContext context = SslContextBuilder.forClient()
-                        // .keyManager(null, null, new
-                        // X509Certificate[]{getCertFromFile(MqttClient.this.clientConfig.getClientCert())})
-                        .keyManager(createKeyManager()).trustManager(createTrustManager()).build();
+                SslContext context = SslContextBuilder.forClient().keyManager(createKeyManager())
+                        .trustManager(createTrustManager()).build();
                 ch.pipeline().addLast("ssl", context.newHandler(ch.alloc()));
             }
 
@@ -539,11 +540,12 @@ public final class MqttClient {
                 Security.setProperty("ocsp.enable", "true");
                 Security.setProperty("ocsp.responderURL", clientConfig.getOcspResponderURL());
 
-              //TODO  clean here
                 OCSPTrustManagerFactory ocsp = OCSPTrustManagerFactory.INSTANCE;
-                OCSPTrustManagerFactory.setOcspServerString(clientConfig.getOcspResponderURL());
-                OCSPTrustManagerFactory.setOcspRootCACert(getCertFromFile(new File(
-                        "/Users/vange/Documents/projects/Geely-CSP/others/Certification/External-Services-Issuing-Test-CA.pem")));
+                while (!OCSPTrustManagerFactory.inited.get()
+                        && OCSPTrustManagerFactory.inited.compareAndSet(false, true)) {
+                    OCSPTrustManagerFactory.setOcspServerString(clientConfig.getOcspResponderURL());
+                    OCSPTrustManagerFactory.setOcspRootCACert(getCertFromFile(clientConfig.getOcspRootCA()));
+                }
 
                 return ocsp;
             }
@@ -553,21 +555,35 @@ public final class MqttClient {
 
         private KeyManagerFactory createKeyManager() {
             KeyManagerFactory kmf = null;
-            InputStream in;
-            String pkPath = "/Users/vange/Programs/apache-activemq-5.14.5/conf/client.ks";
-            String caPath = "/Users/vange/Programs/apache-activemq-5.14.5/conf/client.ts";
+            String privateKeyEntryPassword = "password";
             try {
                 KeyStore ks = KeyStore.getInstance("JKS");
-                in = new FileInputStream(pkPath);
-                ks.load(in, "password".toCharArray());
+                ks.load(null, null);
+
+                File clientKeyFile = clientConfig.getClientKeyFile();
+                File clientCertFile = clientConfig.getClientCertFile();
+                if (clientKeyFile == null || clientCertFile == null || !clientKeyFile.exists()
+                        || !clientKeyFile.isFile() || !clientCertFile.exists() || !clientCertFile.isFile()) {
+                    throw new FileNotFoundException("Client's key and cert files are missing."
+                            + (clientKeyFile == null ? "" : "\n" + clientKeyFile.getAbsolutePath())
+                            + (clientCertFile == null ? "" : "\n" + clientCertFile.getAbsolutePath()));
+                }
+
+                Certificate[] chain = { getCertFromFile(clientCertFile) };
+                KeyFactory rSAKeyFactory = KeyFactory.getInstance("RSA");
+                PrivateKey privateKey = new PrivateKeyReader(clientKeyFile.getAbsolutePath()).getPrivateKey();
+                ks.setEntry("client", new KeyStore.PrivateKeyEntry(privateKey, chain),
+                        new KeyStore.PasswordProtection(privateKeyEntryPassword.toCharArray()));
+
                 kmf = KeyManagerFactory.getInstance("SunX509");
-                kmf.init(ks, "password".toCharArray());
-                in.close();
-            } catch (Exception e) {
+                kmf.init(ks, privateKeyEntryPassword.toCharArray());
+            } catch (Throwable e) {
                 e.printStackTrace();
+                throw new RuntimeException(e);
             }
             return kmf;
         }
+
     }
 
     /*

@@ -10,32 +10,47 @@ import io.netty.channel.Channel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
-@SuppressWarnings({"WeakerAccess", "unused"})
+@SuppressWarnings({ "WeakerAccess", "unused" })
 public final class MqttClientConfig {
 
-    private final String randomClientId;
+    private final String             randomClientId;
 
-    private String clientId;
-    private int timeoutSeconds = 10;
-    private MqttVersion protocolVersion = MqttVersion.MQTT_3_1;
-    @Nullable private String username = null;
-    @Nullable private String password = null;
-    private boolean cleanSession = false;
-    @Nullable private MqttLastWill lastWill;
-    private Class<? extends Channel> channelClass = NioSocketChannel.class;
-    
-    private boolean useTLS = false;
-    private File clientCert;
-    private File trustStore;
-    private boolean useOCSP = false;
-    private String ocspResponderURL;
-    
+    private String                   clientId;
+
+    private int                      timeoutSeconds  = 10;
+
+    private MqttVersion              protocolVersion = MqttVersion.MQTT_3_1;
+
+    @Nullable
+    private String                   username        = null;
+
+    @Nullable
+    private String                   password        = null;
+
+    private boolean                  cleanSession    = false;
+
+    @Nullable
+    private MqttLastWill             lastWill;
+
+    private Class<? extends Channel> channelClass    = NioSocketChannel.class;
+
+    private boolean                  useTLS          = false;
+
+    private File                     clientKeyFile;
+
+    private File                     clientCertFile;
+
+    private File                     ocspRootCA;
+
+    private boolean                  useOCSP         = false;
+
+    private String                   ocspResponderURL;
 
     public MqttClientConfig() {
         Random random = new Random();
         String id = "netty-mqtt/";
         String[] options = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
-        for(int i = 0; i < 8; i++){
+        for (int i = 0; i < 8; i++) {
             id += options[random.nextInt(options.length)];
         }
         this.clientId = id;
@@ -48,9 +63,9 @@ public final class MqttClientConfig {
     }
 
     public void setClientId(@Nullable String clientId) {
-        if(clientId == null){
+        if (clientId == null) {
             this.clientId = randomClientId;
-        }else{
+        } else {
             this.clientId = clientId;
         }
     }
@@ -60,7 +75,7 @@ public final class MqttClientConfig {
     }
 
     public void setTimeoutSeconds(int timeoutSeconds) {
-        if(timeoutSeconds != -1 && timeoutSeconds <= 0){
+        if (timeoutSeconds != -1 && timeoutSeconds <= 0) {
             throw new IllegalArgumentException("timeoutSeconds must be > 0 or -1");
         }
         this.timeoutSeconds = timeoutSeconds;
@@ -71,7 +86,7 @@ public final class MqttClientConfig {
     }
 
     public void setProtocolVersion(MqttVersion protocolVersion) {
-        if(protocolVersion == null){
+        if (protocolVersion == null) {
             throw new NullPointerException("protocolVersion");
         }
         this.protocolVersion = protocolVersion;
@@ -128,20 +143,20 @@ public final class MqttClientConfig {
         this.useTLS = useTLS;
     }
 
-    public File getClientCert() {
-        return clientCert;
+    public File getClientKeyFile() {
+        return clientKeyFile;
     }
 
-    public void setClientCert(File clientCert) {
-        this.clientCert = clientCert;
+    public void setClientKeyFile(File clientKeyFile) {
+        this.clientKeyFile = clientKeyFile;
     }
 
-    public File getTrustStore() {
-        return trustStore;
+    public File getClientCertFile() {
+        return clientCertFile;
     }
 
-    public void setTrustStore(File trustStore) {
-        this.trustStore = trustStore;
+    public void setClientCertFile(File clientCertFile) {
+        this.clientCertFile = clientCertFile;
     }
 
     public boolean isUseOCSP() {
@@ -159,6 +174,13 @@ public final class MqttClientConfig {
     public void setOcspResponderURL(String ocspResponderURL) {
         this.ocspResponderURL = ocspResponderURL;
     }
-    
-    
+
+    public File getOcspRootCA() {
+        return ocspRootCA;
+    }
+
+    public void setOcspRootCA(File ocspRootCA) {
+        this.ocspRootCA = ocspRootCA;
+    }
+
 }

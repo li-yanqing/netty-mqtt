@@ -16,6 +16,7 @@ import java.security.cert.X509Certificate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.ssl.ManagerFactoryParameters;
 import javax.net.ssl.SSLEngine;
@@ -23,7 +24,6 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509ExtendedTrustManager;
 
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
-import io.netty.util.internal.EmptyArrays;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -38,6 +38,8 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
 
     private static final TrustManager           tm             = new InnerX509TrustManager();
 
+    public static final AtomicBoolean           inited         = new AtomicBoolean(false);
+
     private static String                       ocspServerString;
 
     private static X509Certificate              ocspRootCACert = null;
@@ -48,8 +50,6 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
     public static String getOcspServerString() {
         return ocspServerString;
     }
-    
-    
 
     public static X509Certificate getOcspRootCACert() {
         return ocspRootCACert;
@@ -78,48 +78,42 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-            // TODO Auto-generated method stub
-            
+
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-            // TODO Auto-generated method stub
-            
+
         }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
-            // TODO Auto-generated method stub
             return null;
         }
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket)
                 throws CertificateException {
-            // TODO Auto-generated method stub
-            
+
         }
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
                 throws CertificateException {
-            // TODO Auto-generated method stub
-            
+
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket)
                 throws CertificateException {
-            
+
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
                 throws CertificateException {
-            // TODO Auto-generated method stub
-            
-            //TODO  clean here
+
+          //TODO  test again!
             try {
                 CertPath cp = null;
                 Vector certs = new Vector();
@@ -130,9 +124,8 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
 
                 // handle location of OCSP server
                 ocspServer = new URI(ocspServerString);
-                System.out.println("Using the OCSP server at: ca2");
-                System.out.println("to check the revocation status of: " + certs.elementAt(0));
-                System.out.println();
+                logger.debug("Using the OCSP server");
+                logger.debug("to check the revocation status of: " + certs.elementAt(0));
 
                 // init cert path
                 CertificateFactory cf = CertificateFactory.getInstance("X509");
@@ -153,6 +146,7 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
                 // params.addCertStore(store);
 
                 // enable OCSP
+                logger.debug("Enable ocsp");
                 Security.setProperty("ocsp.enable", "true");
 
                 if (ocspServer != null) {
@@ -165,19 +159,18 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
                 X509Certificate trustedCert = (X509Certificate) cpv_result.getTrustAnchor().getTrustedCert();
 
                 if (trustedCert == null) {
-                    System.out.println("Trsuted Cert = NULL");
+                    logger.debug("Trsuted Cert = NULL");
                 } else {
-                    System.out.println("Trusted CA DN = " + trustedCert.getSubjectDN());
+                    logger.debug("Trusted CA DN = " + trustedCert.getSubjectDN());
                 }
             } catch (CertPathValidatorException e) {
+                // TODO re-throw exception
                 e.printStackTrace();
             } catch (Exception e) {
+                // TODO re-throw exception
                 e.printStackTrace();
             }
 
-            System.out.println("CERTIFICATE VALIDATION SUCCEEDED");
-
-            
         }
 
     }
