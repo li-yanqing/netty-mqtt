@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.PrivateKey;
@@ -12,8 +11,6 @@ import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.RSAPrivateKeySpec;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -22,6 +19,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 
 import com.google.common.collect.HashMultimap;
@@ -54,8 +53,7 @@ import io.netty.handler.codec.mqtt.MqttUnsubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttUnsubscribePayload;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.concurrent.DefaultPromise;
@@ -517,9 +515,13 @@ public final class MqttClient {
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
             if (MqttClient.this.clientConfig.isUseTLS()) {
-                SslContext context = SslContextBuilder.forClient().keyManager(createKeyManager())
-                        .trustManager(createTrustManager()).build();
-                ch.pipeline().addLast("ssl", context.newHandler(ch.alloc()));
+                
+                 SSLContext context = SSLContext.getInstance("TLS");
+                 context.init(createKeyManager().getKeyManagers(), createTrustManager().getTrustManagers(), null);
+                 SSLEngine engine = context.createSSLEngine();
+                 engine.setUseClientMode(true);
+                 ch.pipeline().addLast("ssl", new SslHandler(engine));
+
             }
 
             ch.pipeline().addLast("mqttDecoder", new MqttDecoder());
