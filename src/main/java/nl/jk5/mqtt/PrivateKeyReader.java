@@ -100,7 +100,9 @@ public class PrivateKeyReader {
             } else {
                 keySpec = new PKCS8EncodedKeySpec(encoded);
             }
-            KeyFactory kf = KeyFactory.getInstance("RSA");
+            
+                
+            KeyFactory kf = isRSAKey ? KeyFactory.getInstance("RSA"):KeyFactory.getInstance("EC");;
             key = kf.generatePrivate(keySpec);
         } finally {
             if (fis != null)
