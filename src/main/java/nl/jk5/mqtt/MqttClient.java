@@ -572,7 +572,6 @@ public final class MqttClient {
                 }
 
                 Certificate[] chain = { getCertFromFile(clientCertFile) };
-                KeyFactory rSAKeyFactory = KeyFactory.getInstance("RSA");
                 PrivateKey privateKey = new PrivateKeyReader(clientKeyFile.getAbsolutePath()).getPrivateKey();
                 ks.setEntry("client", new KeyStore.PrivateKeyEntry(privateKey, chain),
                         new KeyStore.PasswordProtection(privateKeyEntryPassword.toCharArray()));
