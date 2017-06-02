@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Security;
@@ -514,16 +513,27 @@ public final class MqttClient {
 
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
+            MqttChannelHandler mqttChannelHandler = new MqttChannelHandler(MqttClient.this, connectFuture);
             if (MqttClient.this.clientConfig.isUseTLS()) {
-                
-                 SSLContext context = SSLContext.getInstance("TLS");
-                 context.init(createKeyManager().getKeyManagers(), createTrustManager().getTrustManagers(), null);
-                 SSLEngine engine = context.createSSLEngine();
-                 engine.setUseClientMode(true);
-                 ch.pipeline().addLast("ssl", new SslHandler(engine));
 
+                SSLContext context = SSLContext.getInstance("TLS");
+                context.init(createKeyManager().getKeyManagers(), createTrustManager().getTrustManagers(), null);
+                SSLEngine engine = context.createSSLEngine();
+                engine.setUseClientMode(true);
+                SslHandler sslHandler = new SslHandler(engine);
+                ch.pipeline().addLast("ssl", sslHandler);
+                sslHandler.handshakeFuture().addListener(f -> {
+                    initMqttChannel(ch, mqttChannelHandler);
+                    ch.writeAndFlush(mqttChannelHandler.generateConnectMessage());
+                });
+
+            } else {
+                initMqttChannel(ch, mqttChannelHandler);
             }
 
+        }
+
+        protected void initMqttChannel(SocketChannel ch, MqttChannelHandler mqttChannelHandler) throws Exception {
             ch.pipeline().addLast("mqttDecoder", new MqttDecoder());
             ch.pipeline().addLast("mqttEncoder", MqttEncoder.INSTANCE);
             ch.pipeline().addLast("idleStateHandler",
@@ -531,7 +541,7 @@ public final class MqttClient {
                             MqttClient.this.clientConfig.getTimeoutSeconds(), 0));
             ch.pipeline().addLast("mqttPingHandler",
                     new MqttPingHandler(MqttClient.this.clientConfig.getTimeoutSeconds()));
-            ch.pipeline().addLast("mqttHandler", new MqttChannelHandler(MqttClient.this, connectFuture));
+            ch.pipeline().addLast("mqttHandler", mqttChannelHandler);
 
         }
 

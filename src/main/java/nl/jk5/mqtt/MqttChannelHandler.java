@@ -51,6 +51,10 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         super.channelActive(ctx);
 
+        ctx.channel().writeAndFlush(generateConnectMessage());
+    }
+    
+    public MqttConnectMessage generateConnectMessage(){
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.CONNECT, false, MqttQoS.AT_MOST_ONCE, false, 0);
         MqttConnectVariableHeader variableHeader = new MqttConnectVariableHeader(
                 this.client.getClientConfig().getProtocolVersion().protocolName(),  // Protocol Name
@@ -73,7 +77,7 @@ final class MqttChannelHandler extends SimpleChannelInboundHandler<MqttMessage> 
                 this.client.getClientConfig().getUsername(),
                 this.client.getClientConfig().getPassword()
         );
-        ctx.channel().writeAndFlush(new MqttConnectMessage(fixedHeader, variableHeader, payload));
+        return new MqttConnectMessage(fixedHeader, variableHeader, payload);
     }
 
     @Override
