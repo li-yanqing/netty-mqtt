@@ -113,7 +113,6 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
         public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
                 throws CertificateException {
 
-          //TODO  test again!
             try {
                 CertPath cp = null;
                 Vector certs = new Vector();
@@ -164,11 +163,11 @@ public class OCSPTrustManagerFactory extends SimpleTrustManagerFactory {
                     logger.debug("Trusted CA DN = " + trustedCert.getSubjectDN());
                 }
             } catch (CertPathValidatorException e) {
-                // TODO re-throw exception
                 e.printStackTrace();
+                throw new CertificateException(e);
             } catch (Exception e) {
-                // TODO re-throw exception
                 e.printStackTrace();
+                throw new CertificateException(e);
             }
 
         }
